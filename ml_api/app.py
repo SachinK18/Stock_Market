@@ -1,4 +1,3 @@
-
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 import yfinance as yf
@@ -206,6 +205,34 @@ def predict_stock():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/heatmap-image', methods=['POST'])
+def get_heatmap_image():
+    """Generate heatmap image for frontend display"""
+    try:
+        data = request.get_json()
+        ticker = data.get('ticker', 'INFIBEAM.BO')
+        end_date = data.get('end_date', '2025-08-28')
+
+        # Get stock data
+        stock_data, error = predictor.prepare_data(ticker, end_date)
+        if error:
+            return jsonify({'error': error}), 400
+
+        # Generate heatmap image
+        heatmap_buffer = generate_chart_image(stock_data, 'correlation', ticker)
+
+        # Convert to base64 for frontend
+        import base64
+        img_base64 = base64.b64encode(heatmap_buffer.getvalue()).decode('utf-8')
+
+        return jsonify({
+            'image': img_base64,
+            'ticker': ticker
+        })
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/chart-data', methods=['POST'])
 def get_chart_data():
     """Generate chart data based on the ML code provided"""
@@ -276,16 +303,24 @@ def get_chart_data():
 
         # Convert correlation matrix to heatmap data format
         heatmap_data = []
-        print('DEBUG: Correlation matrix values:')
-        print(correlation_matrix)
         for i, feature1 in enumerate(available_features):
             for j, feature2 in enumerate(available_features):
-                value = float(correlation_matrix.iloc[i, j])
-                print(f'DEBUG: {feature1} vs {feature2} = {value}')
                 heatmap_data.append({
                     'x': j,
                     'y': i,
-                    'v': value
+                    'v': float(correlation_matrix.iloc[i, j])
+                })
+
+        # Also create formatted display data for PDF
+        heatmap_display_data = []
+        for i, feature1 in enumerate(available_features):
+            for j, feature2 in enumerate(available_features):
+                value = float(correlation_matrix.iloc[i, j])
+                heatmap_display_data.append({
+                    'x': j,
+                    'y': i,
+                    'v': value,
+                    'display': f'{value:.2f}'
                 })
 
         # Also keep simple correlation data for display
@@ -341,88 +376,6 @@ def get_chart_data():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-
-@app.route('/api/correlation-heatmap-image', methods=['GET'])
-def correlation_heatmap_image():
-    try:
-        ticker = request.args.get('ticker', 'INFIBEAM.BO')
-        end_date = request.args.get('end_date', None)
-        print(f'DEBUG: correlation_heatmap_image called for ticker={ticker}, end_date={end_date}')
-
-        stock_data, error = predictor.prepare_data(ticker, end_date)
-        # If data couldn't be prepared, return a small PNG image with the error text
-        if error:
-            fig, ax = plt.subplots(figsize=(8, 3))
-            ax.text(0.5, 0.5, f"Error: {error}", ha='center', va='center', fontsize=14, color='red')
-            ax.axis('off')
-            buf = io.BytesIO()
-            plt.savefig(buf, format='png', bbox_inches='tight', dpi=150, facecolor='white')
-            buf.seek(0)
-            plt.close(fig)
-            return send_file(buf, mimetype='image/png')
-
-        # Use last 100 data points
-        chart_data = stock_data.tail(100)
-        features = [
-            "Daily_Return", "MA_5", "MA_20", "MA_50",
-            "Price_MA5_ratio", "Price_MA20_ratio", "RSI", "Volatility_20"
-        ]
-        available_features = [f for f in features if f in chart_data.columns]
-        if not available_features:
-            fig, ax = plt.subplots(figsize=(8, 3))
-            ax.text(0.5, 0.5, f"Error: No features available for heatmap", ha='center', va='center', fontsize=14, color='red')
-            ax.axis('off')
-            buf = io.BytesIO()
-            plt.savefig(buf, format='png', bbox_inches='tight', dpi=150, facecolor='white')
-            buf.seek(0)
-            plt.close(fig)
-            return send_file(buf, mimetype='image/png')
-
-        corr_matrix = chart_data[available_features].corr()
-
-        plt.clf()
-        # Larger figure and higher DPI for clarity
-        fig, ax = plt.subplots(figsize=(14, 12))
-        sns.heatmap(
-            corr_matrix,
-            annot=True,
-            cmap="coolwarm",
-            vmin=-1, vmax=1,
-            linewidths=0.5,
-            cbar=True,
-            ax=ax,
-            fmt=".2f",
-            annot_kws={"size": 14, 'weight': 'bold'},
-            square=True
-        )
-        ax.set_title(f"{ticker} - Feature Correlation Heatmap", fontsize=20, fontweight='bold')
-        ax.set_xticklabels(available_features, rotation=45, ha='right', fontsize=14)
-        ax.set_yticklabels(available_features, fontsize=14)
-        ax.set_xlabel("")
-        ax.set_ylabel("")
-        plt.tight_layout()
-
-        img_buffer = io.BytesIO()
-        # Save at higher DPI so it appears crisp when enlarged in the frontend
-        plt.savefig(img_buffer, format='png', dpi=300, bbox_inches='tight', facecolor='white')
-        img_buffer.seek(0)
-        plt.close()
-        return send_file(img_buffer, mimetype='image/png')
-
-    except Exception as e:
-        # On unexpected exception, return an image describing the error so frontend can display it
-        try:
-            fig, ax = plt.subplots(figsize=(8, 3))
-            ax.text(0.5, 0.5, f"Server error: {str(e)}", ha='center', va='center', fontsize=12, color='red')
-            ax.axis('off')
-            buf = io.BytesIO()
-            plt.savefig(buf, format='png', bbox_inches='tight', dpi=150, facecolor='white')
-            buf.seek(0)
-            plt.close(fig)
-            return send_file(buf, mimetype='image/png')
-        except Exception:
-            return jsonify({'error': str(e)}), 500
-
 def generate_chart_image(stock_data, chart_type, ticker):
     """Generate chart images for PDF report"""
     try:
@@ -453,32 +406,31 @@ def generate_chart_image(stock_data, chart_type, ticker):
             ax.set_ylim(0, 100)
 
         elif chart_type == 'correlation':
+            # Create correlation heatmap
+            features = ['Close', 'MA_5', 'MA_20', 'MA_50', 'RSI', 'Daily_Return', 'Volatility_20']
+            available_features = [f for f in features if f in chart_data.columns]
+            correlation_matrix = chart_data[available_features].corr()
 
-                # Create correlation heatmap using seaborn for better visual
-                features = ["Daily_Return", "MA_5", "MA_20", "MA_50", "Price_MA5_ratio", "Price_MA20_ratio", "RSI", "Volatility_20"]
-                available_features = [f for f in features if f in chart_data.columns]
-                correlation_matrix = chart_data[available_features].corr()
+            # Create heatmap with proper square aspect ratio
+            im = ax.imshow(correlation_matrix.values, cmap='coolwarm', aspect='equal', vmin=-1, vmax=1)
+            ax.set_xticks(range(len(available_features)))
+            ax.set_yticks(range(len(available_features)))
+            ax.set_xticklabels(available_features, rotation=45, ha='right', fontsize=10)
+            ax.set_yticklabels(available_features, fontsize=10)
+            ax.set_title(f'{ticker} - Feature Correlation Heatmap', fontsize=14, fontweight='bold')
 
-                # Exact match to provided image
-                sns.heatmap(
-                    correlation_matrix,
-                    annot=True,
-                    cmap='coolwarm',
-                    vmin=-1, vmax=1,
-                    linewidths=0.5,
-                    cbar=True,
-                    ax=ax,
-                    fmt='.2f',
-                    annot_kws={"size": 12},
-                    square=True
-                )
-                ax.set_title('Feature Correlation Heatmap', fontsize=18)
-                ax.set_xticklabels(available_features, rotation=45, ha='right', fontsize=12)
-                ax.set_yticklabels(available_features, fontsize=12)
-                # Remove axis label for x/y to match image
-                ax.set_xlabel("")
-                ax.set_ylabel("")
-                plt.tight_layout()
+            # Add correlation values as text with better formatting
+            for i in range(len(available_features)):
+                for j in range(len(available_features)):
+                    value = correlation_matrix.iloc[i, j]
+                    text_color = 'white' if abs(value) > 0.5 else 'black'
+                    ax.text(j, i, f'{value:.2f}',
+                           ha="center", va="center", color=text_color, fontsize=9, fontweight='bold')
+
+            # Add colorbar with better positioning
+            cbar = plt.colorbar(im, ax=ax, shrink=0.8, aspect=20)
+            cbar.set_label('Correlation Coefficient', fontsize=12, fontweight='bold')
+            cbar.ax.tick_params(labelsize=10)
 
         ax.set_xlabel('Date', fontsize=12)
         ax.legend()
@@ -699,6 +651,285 @@ def get_available_stocks():
         {'symbol': 'TTML.BO', 'name': 'Tata Teleservices (Maharashtra) Limited'}
     ]
     return jsonify(stocks)
+
+@app.route('/api/search-stocks', methods=['GET'])
+def search_stocks():
+    """Search for stocks using yfinance from all nations"""
+    try:
+        query = request.args.get('q', '').strip()
+
+        if not query or len(query) < 2:
+            return jsonify({'stocks': []})
+
+        # Use yfinance to search for stocks across all markets
+        try:
+            # First try to get ticker info directly if it's a valid symbol
+            ticker = yf.Ticker(query)
+            ticker_info = ticker.info
+
+            # If we get valid ticker info, add it to results
+            search_results = []
+            if ticker_info and 'symbol' in ticker_info and 'shortName' in ticker_info:
+                exchange = ticker_info.get('exchange', 'Unknown')
+                currency = ticker_info.get('currency', 'Unknown')
+
+                # Determine country/region based on exchange or other info
+                country = get_country_from_exchange(exchange)
+
+                search_results.append({
+                    'symbol': ticker_info['symbol'],
+                    'name': ticker_info['shortName'],
+                    'exchange': exchange,
+                    'country': country,
+                    'currency': currency
+                })
+
+            # Also search for similar symbols/tickers using yfinance search
+            try:
+                # Use yfinance's search functionality for broader results
+                search_tickers = []
+                common_suffixes = ['', '.NS', '.BO', '.NSE', '.BSE', '.TO', '.L', '.PA', '.DE', '.F', '.MI', '.AS', '.AX', '.CO', '.SA']
+
+                # Try common symbol variations
+                for suffix in common_suffixes[:5]:  # Limit to avoid too many requests
+                    try:
+                        test_ticker = yf.Ticker(query + suffix)
+                        test_info = test_ticker.info
+                        if (test_info and 'symbol' in test_info and
+                            test_info['symbol'] not in [s['symbol'] for s in search_results]):
+                            exchange = test_info.get('exchange', 'Unknown')
+                            country = get_country_from_exchange(exchange)
+                            search_results.append({
+                                'symbol': test_info['symbol'],
+                                'name': test_info.get('shortName', test_info['symbol']),
+                                'exchange': exchange,
+                                'country': country,
+                                'currency': test_info.get('currency', 'Unknown')
+                            })
+                    except:
+                        continue
+
+            except Exception as e:
+                print(f"Search error: {e}")
+
+        except Exception as e:
+            print(f"Ticker lookup error: {e}")
+            search_results = []
+
+        # Also include some popular international stocks for better coverage
+        popular_stocks = get_popular_international_stocks(query)
+
+        # Combine results and remove duplicates
+        all_stocks = search_results + popular_stocks
+        seen_symbols = set()
+        unique_stocks = []
+
+        for stock in all_stocks:
+            if stock['symbol'] not in seen_symbols:
+                seen_symbols.add(stock['symbol'])
+                unique_stocks.append(stock)
+
+        # Filter based on search query (case-insensitive)
+        filtered_stocks = []
+        query_lower = query.lower()
+
+        for stock in unique_stocks:
+            if (query_lower in stock['symbol'].lower() or
+                query_lower in stock['name'].lower() or
+                any(word.lower().startswith(query_lower) for word in stock['name'].split()) or
+                (stock.get('country', '').lower().startswith(query_lower))):
+                filtered_stocks.append(stock)
+
+        # Sort by relevance (prioritize symbol matches, then name matches)
+        def sort_key(stock):
+            symbol_lower = stock['symbol'].lower()
+            name_lower = stock['name'].lower()
+
+            if query_lower == symbol_lower:
+                return 0  # Exact symbol match
+            elif query_lower in symbol_lower:
+                return 1  # Partial symbol match
+            elif query_lower in name_lower:
+                return 2  # Name match
+            else:
+                return 3  # Other match
+
+        filtered_stocks.sort(key=sort_key)
+
+        # Limit results to 30 for better performance
+        filtered_stocks = filtered_stocks[:30]
+
+        return jsonify({
+            'stocks': filtered_stocks,
+            'query': query,
+            'count': len(filtered_stocks)
+        })
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+def get_country_from_exchange(exchange):
+    """Map exchange codes to country names"""
+    exchange_country_map = {
+        'NSE': 'India',
+        'BSE': 'India',
+        'BOM': 'India',
+        'NSI': 'India',
+        'NYSE': 'United States',
+        'NASDAQ': 'United States',
+        'LSE': 'United Kingdom',
+        'LON': 'United Kingdom',
+        'EPA': 'France',
+        'PAR': 'France',
+        'FRA': 'Germany',
+        'ETR': 'Germany',
+        'BIT': 'Italy',
+        'MIL': 'Italy',
+        'AMS': 'Netherlands',
+        'AEX': 'Netherlands',
+        'BRU': 'Belgium',
+        'EBR': 'Belgium',
+        'MCE': 'Spain',
+        'BME': 'Spain',
+        'STO': 'Sweden',
+        'OMX': 'Sweden',
+        'HEL': 'Finland',
+        'CPH': 'Denmark',
+        'OSL': 'Norway',
+        'ICE': 'Iceland',
+        'TSE': 'Japan',
+        'TYO': 'Japan',
+        'HKEX': 'Hong Kong',
+        'HKG': 'Hong Kong',
+        'SSE': 'China',
+        'SHG': 'China',
+        'SZSE': 'China',
+        'SHE': 'China',
+        'ASX': 'Australia',
+        'TSX': 'Canada',
+        'TOR': 'Canada',
+        'BVMF': 'Brazil',
+        'SAO': 'Brazil',
+        'BCBA': 'Argentina',
+        'BUE': 'Argentina',
+        'BMV': 'Mexico',
+        'BCS': 'Chile',
+        'SGO': 'Chile',
+        'BVL': 'Peru',
+        'LIM': 'Peru',
+        'BSSE': 'Bulgaria',
+        'SOF': 'Bulgaria',
+        'PSE': 'Philippines',
+        'SET': 'Thailand',
+        'BKK': 'Thailand',
+        'IDX': 'Indonesia',
+        'JSE': 'South Africa',
+        'KRX': 'South Korea',
+        'SEO': 'South Korea',
+        'TWSE': 'Taiwan',
+        'TAI': 'Taiwan',
+        'BIST': 'Turkey',
+        'IST': 'Turkey',
+        'TASE': 'Israel',
+        'TLV': 'Israel',
+        'MOEX': 'Russia',
+        'MISX': 'Russia',
+        'WSE': 'Poland',
+        'WAR': 'Poland',
+        'BVB': 'Romania',
+        'BUC': 'Romania',
+        'VSE': 'Austria',
+        'VIE': 'Austria',
+        'SWX': 'Switzerland',
+        'SIX': 'Switzerland',
+        'OSE': 'Norway',
+        'NOK': 'Norway'
+    }
+
+    return exchange_country_map.get(exchange, 'International')
+
+def get_popular_international_stocks(query):
+    """Get popular international stocks for better search coverage"""
+    popular_stocks = [
+        # US Stocks
+        {'symbol': 'AAPL', 'name': 'Apple Inc.', 'exchange': 'NASDAQ', 'country': 'United States', 'currency': 'USD'},
+        {'symbol': 'MSFT', 'name': 'Microsoft Corporation', 'exchange': 'NASDAQ', 'country': 'United States', 'currency': 'USD'},
+        {'symbol': 'GOOGL', 'name': 'Alphabet Inc.', 'exchange': 'NASDAQ', 'country': 'United States', 'currency': 'USD'},
+        {'symbol': 'AMZN', 'name': 'Amazon.com Inc.', 'exchange': 'NASDAQ', 'country': 'United States', 'currency': 'USD'},
+        {'symbol': 'TSLA', 'name': 'Tesla Inc.', 'exchange': 'NASDAQ', 'country': 'United States', 'currency': 'USD'},
+        {'symbol': 'META', 'name': 'Meta Platforms Inc.', 'exchange': 'NASDAQ', 'country': 'United States', 'currency': 'USD'},
+        {'symbol': 'NVDA', 'name': 'NVIDIA Corporation', 'exchange': 'NASDAQ', 'country': 'United States', 'currency': 'USD'},
+        {'symbol': 'NFLX', 'name': 'Netflix Inc.', 'exchange': 'NASDAQ', 'country': 'United States', 'currency': 'USD'},
+        {'symbol': 'DIS', 'name': 'The Walt Disney Company', 'exchange': 'NYSE', 'country': 'United States', 'currency': 'USD'},
+        {'symbol': 'JPM', 'name': 'JPMorgan Chase & Co.', 'exchange': 'NYSE', 'country': 'United States', 'currency': 'USD'},
+        {'symbol': 'V', 'name': 'Visa Inc.', 'exchange': 'NYSE', 'country': 'United States', 'currency': 'USD'},
+        {'symbol': 'JNJ', 'name': 'Johnson & Johnson', 'exchange': 'NYSE', 'country': 'United States', 'currency': 'USD'},
+        {'symbol': 'WMT', 'name': 'Walmart Inc.', 'exchange': 'NYSE', 'country': 'United States', 'currency': 'USD'},
+        {'symbol': 'PG', 'name': 'The Procter & Gamble Company', 'exchange': 'NYSE', 'country': 'United States', 'currency': 'USD'},
+        {'symbol': 'UNH', 'name': 'UnitedHealth Group Incorporated', 'exchange': 'NYSE', 'country': 'United States', 'currency': 'USD'},
+        {'symbol': 'HD', 'name': 'The Home Depot Inc.', 'exchange': 'NYSE', 'country': 'United States', 'currency': 'USD'},
+        {'symbol': 'BAC', 'name': 'Bank of America Corporation', 'exchange': 'NYSE', 'country': 'United States', 'currency': 'USD'},
+        {'symbol': 'KO', 'name': 'The Coca-Cola Company', 'exchange': 'NYSE', 'country': 'United States', 'currency': 'USD'},
+        {'symbol': 'PFE', 'name': 'Pfizer Inc.', 'exchange': 'NYSE', 'country': 'United States', 'currency': 'USD'},
+        {'symbol': 'PEP', 'name': 'PepsiCo Inc.', 'exchange': 'NASDAQ', 'country': 'United States', 'currency': 'USD'},
+
+        # UK Stocks
+        {'symbol': 'AZN.L', 'name': 'AstraZeneca PLC', 'exchange': 'LSE', 'country': 'United Kingdom', 'currency': 'GBP'},
+        {'symbol': 'HSBA.L', 'name': 'HSBC Holdings PLC', 'exchange': 'LSE', 'country': 'United Kingdom', 'currency': 'GBP'},
+        {'symbol': 'ULVR.L', 'name': 'Unilever PLC', 'exchange': 'LSE', 'country': 'United Kingdom', 'currency': 'GBP'},
+        {'symbol': 'DGE.L', 'name': 'Diageo PLC', 'exchange': 'LSE', 'country': 'United Kingdom', 'currency': 'GBP'},
+        {'symbol': 'RIO.L', 'name': 'Rio Tinto PLC', 'exchange': 'LSE', 'country': 'United Kingdom', 'currency': 'GBP'},
+        {'symbol': 'BATS.L', 'name': 'British American Tobacco PLC', 'exchange': 'LSE', 'country': 'United Kingdom', 'currency': 'GBP'},
+
+        # European Stocks
+        {'symbol': 'SAP.DE', 'name': 'SAP SE', 'exchange': 'XETRA', 'country': 'Germany', 'currency': 'EUR'},
+        {'symbol': 'SIE.DE', 'name': 'Siemens AG', 'exchange': 'XETRA', 'country': 'Germany', 'currency': 'EUR'},
+        {'symbol': 'ALV.DE', 'name': 'Allianz SE', 'exchange': 'XETRA', 'country': 'Germany', 'currency': 'EUR'},
+        {'symbol': 'MC.PA', 'name': 'LVMH Moët Hennessy Louis Vuitton SE', 'exchange': 'EPA', 'country': 'France', 'currency': 'EUR'},
+        {'symbol': 'OR.PA', 'name': 'L\'Oréal S.A.', 'exchange': 'EPA', 'country': 'France', 'currency': 'EUR'},
+        {'symbol': 'ASML.AS', 'name': 'ASML Holding N.V.', 'exchange': 'AMS', 'country': 'Netherlands', 'currency': 'EUR'},
+        {'symbol': 'NESN.SW', 'name': 'Nestlé S.A.', 'exchange': 'SIX', 'country': 'Switzerland', 'currency': 'CHF'},
+        {'symbol': 'ROG.SW', 'name': 'Roche Holding AG', 'exchange': 'SIX', 'country': 'Switzerland', 'currency': 'CHF'},
+        {'symbol': 'NOVN.SW', 'name': 'Novartis AG', 'exchange': 'SIX', 'country': 'Switzerland', 'currency': 'CHF'},
+
+        # Asian Stocks
+        {'symbol': '005930.KS', 'name': 'Samsung Electronics Co., Ltd.', 'exchange': 'KRX', 'country': 'South Korea', 'currency': 'KRW'},
+        {'symbol': '000660.KS', 'name': 'SK Hynix Inc.', 'exchange': 'KRX', 'country': 'South Korea', 'currency': 'KRW'},
+        {'symbol': '7203.T', 'name': 'Toyota Motor Corporation', 'exchange': 'TSE', 'country': 'Japan', 'currency': 'JPY'},
+        {'symbol': '6758.T', 'name': 'Sony Group Corporation', 'exchange': 'TSE', 'country': 'Japan', 'currency': 'JPY'},
+        {'symbol': '9984.T', 'name': 'SoftBank Group Corp.', 'exchange': 'TSE', 'country': 'Japan', 'currency': 'JPY'},
+        {'symbol': '0700.HK', 'name': 'Tencent Holdings Limited', 'exchange': 'HKEX', 'country': 'Hong Kong', 'currency': 'HKD'},
+        {'symbol': '1398.HK', 'name': 'Industrial and Commercial Bank of China Limited', 'exchange': 'HKEX', 'country': 'Hong Kong', 'currency': 'HKD'},
+        {'symbol': 'BABA', 'name': 'Alibaba Group Holding Limited', 'exchange': 'NYSE', 'country': 'China', 'currency': 'USD'},
+        {'symbol': 'NIO', 'name': 'NIO Inc.', 'exchange': 'NYSE', 'country': 'China', 'currency': 'USD'},
+
+        # Canadian Stocks
+        {'symbol': 'SHOP.TO', 'name': 'Shopify Inc.', 'exchange': 'TSX', 'country': 'Canada', 'currency': 'CAD'},
+        {'symbol': 'TD.TO', 'name': 'The Toronto-Dominion Bank', 'exchange': 'TSX', 'country': 'Canada', 'currency': 'CAD'},
+        {'symbol': 'ENB.TO', 'name': 'Enbridge Inc.', 'exchange': 'TSX', 'country': 'Canada', 'currency': 'CAD'},
+        {'symbol': 'BNS.TO', 'name': 'The Bank of Nova Scotia', 'exchange': 'TSX', 'country': 'Canada', 'currency': 'CAD'},
+        {'symbol': 'BMO.TO', 'name': 'Bank of Montreal', 'exchange': 'TSX', 'country': 'Canada', 'currency': 'CAD'},
+
+        # Australian Stocks
+        {'symbol': 'CBA.AX', 'name': 'Commonwealth Bank of Australia', 'exchange': 'ASX', 'country': 'Australia', 'currency': 'AUD'},
+        {'symbol': 'BHP.AX', 'name': 'BHP Group Limited', 'exchange': 'ASX', 'country': 'Australia', 'currency': 'AUD'},
+        {'symbol': 'CSL.AX', 'name': 'CSL Limited', 'exchange': 'ASX', 'country': 'Australia', 'currency': 'AUD'},
+        {'symbol': 'NAB.AX', 'name': 'National Australia Bank Limited', 'exchange': 'ASX', 'country': 'Australia', 'currency': 'AUD'},
+        {'symbol': 'WBC.AX', 'name': 'Westpac Banking Corporation', 'exchange': 'ASX', 'country': 'Australia', 'currency': 'AUD'}
+    ]
+
+    # Filter popular stocks based on query
+    filtered_popular = []
+    query_lower = query.lower()
+
+    for stock in popular_stocks:
+        if (query_lower in stock['symbol'].lower() or
+            query_lower in stock['name'].lower() or
+            any(word.lower().startswith(query_lower) for word in stock['name'].split()) or
+            (stock.get('country', '').lower().startswith(query_lower))):
+            filtered_popular.append(stock)
+
+    return filtered_popular[:15]  # Limit popular stock results
 
 @app.route('/health', methods=['GET'])
 def health_check():
