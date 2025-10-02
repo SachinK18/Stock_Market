@@ -1,0 +1,130 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+/node_modules
+/.pnp
+.pnp.js
+/backend/node_modules
+/frontend/node_modules
+/ml_api/__pycache__
+/ml_api/*.pyc
+/ml_api/venv/
+**/node_modules/
+/**/__pycache__/
+/**/*.pyc
+
+# testing
+/coverage
+**/coverage/
+/**/*.log
+
+# production
+/build
+/frontend/build
+/dist
+
+# environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+/backend/.env
+.env.*
+*.env
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+*.tmp
+*.temp
+
+# logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+logs/
+
+# runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# coverage directory used by tools like istanbul
+coverage/
+*.lcov
+
+# nyc test coverage
+.nyc_output
+
+# dependency directories
+jspm_packages/
+
+# optional npm cache directory
+.npm
+
+# optional eslint cache
+.eslintcache
+
+# output of 'npm pack'
+*.tgz
+
+# yarn Integrity file
+.yarn-integrity
+
+# dotenv environment variables file
+.env
+
+# next.js build output
+.next
+
+# nuxt.js build output
+.nuxt
+
+# vuepress build output
+.vuepress/dist
+
+# serverless directories
+.serverless
+
+# fusebox cache
+.fusebox/
+
+# dynamoDB Local files
+.dynamodb/
+
+# stores VSCode versions used for testing VSCode extensions
+.vscode-test
+
+# temporary folders
+tmp/
+temp/
+
+# ML API specific
+/ml_api/*.db
+/ml_api/*.sqlite
+/ml_api/*.sqlite3
+/ml_api/reports/*.pdf
+/ml_api/reports/*.csv
+/ml_api/models/
+/ml_api/checkpoints/
+/ml_api/cache/
+
+# Python virtual environments
+venv/
+env/
+ENV/
