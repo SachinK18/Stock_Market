@@ -124,27 +124,59 @@ A full-stack web application for stock market prediction with user authenticatio
 
 ```
 Stock_Market/
-├── frontend/
-│   ├── src/
-│   │   ├── components/
-│   │   │   └── Navbar.js
-│   │   ├── pages/
-│   │   │   ├── Login.js
-│   │   │   ├── Signup.js
-│   │   │   └── Dashboard.js
-│   │   ├── App.js
-│   │   └── index.js
-│   └── package.json
+├── .gitignore
+├── firstpage.jpg
+├── README.md
+├── test_api.py
 ├── backend/
-│   ├── models/
-│   │   └── User.js
-│   ├── routes/
-│   │   └── auth.js
+│   ├── app.js
+│   ├── package.json
+│   ├── package-lock.json
+│   ├── server.js
 │   ├── middleware/
 │   │   └── auth.js
-│   ├── server.js
-│   └── package.json
-└── README.md
+│   ├── models/
+│   │   └── User.js
+│   └── routes/
+│       └── auth.js
+├── frontend/
+│   ├── postcss.config.js
+│   ├── README.md
+│   ├── tailwind.config.js
+│   ├── package.json
+│   ├── package-lock.json
+│   ├── public/
+│   │   ├── favicon.ico
+│   │   ├── firstpage.jpg
+│   │   ├── index.html
+│   │   ├── logo192.png
+│   │   ├── logo512.png
+│   │   ├── manifest.json
+│   │   └── robots.txt
+│   └── src/
+│       ├── components/
+│       │   ├── Navbar.js
+│       │   ├── ProtectedRoute.js
+│       │   └── SearchableStockSelector.js
+│       ├── pages/
+│       │   ├── Dashboard.js
+│       │   ├── Login.js
+│       │   └── Signup.js
+│       ├── App.css
+│       ├── App.js
+│       ├── App.test.js
+│       ├── index.css
+│       ├── index.js
+│       ├── logo.svg
+│       ├── reportWebVitals.js
+│       └── setupTests.js
+└── ml_api/
+    ├── app.py
+    ├── README.md
+    ├── requirements.txt
+    ├── start_ml_api.bat
+    ├── test_stocks.py
+    └── reports/
 ```
 
 ## Environment Variables
