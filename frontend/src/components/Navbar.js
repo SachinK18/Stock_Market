@@ -26,7 +26,7 @@ function Navbar() {
   };
 
   return (
-    <nav className="bg-gray-900 text-white px-6 py-4 flex justify-between items-center shadow-md">
+    <nav className="bg-black text-white px-6 py-4 flex justify-between items-center shadow-md">
       <Link to={isLoggedIn ? "/dashboard" : "/"} className="text-xl font-bold hover:text-blue-400">
         📈 Stock Prediction
       </Link>

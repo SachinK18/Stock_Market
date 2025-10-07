@@ -83,12 +83,20 @@ function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 flex justify-center items-center pt-16">
-      <div className="bg-white shadow-lg rounded-2xl p-8 w-96 max-w-md mx-4">
-        <h2 className="text-2xl font-bold mb-6 text-center">Welcome Back</h2>
+    <div
+      className="min-h-screen flex justify-center items-center pt-16"
+      style={{
+        backgroundImage: 'url("/firstpage.jpg")',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat'
+      }}
+    >
+      <div className="bg-gray-900 bg-opacity-75 shadow-2xl rounded-2xl p-8 w-96 max-w-md mx-4 backdrop-blur-md border border-gray-700">
+        <h2 className="text-2xl font-bold mb-6 text-center text-white">Welcome Back</h2>
 
         {errors.submit && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+          <div className="bg-red-900 bg-opacity-80 border border-red-500 text-red-200 px-4 py-3 rounded mb-4">
             {errors.submit}
           </div>
         )}
@@ -99,11 +107,11 @@ function Login() {
               type="email"
               name="email"
               placeholder="Email"
-              className={`w-full px-4 py-2 border rounded-lg ${errors.email ? 'border-red-500' : 'border-gray-300'}`}
+              className={`w-full px-4 py-2 bg-gray-800 bg-opacity-50 border rounded-lg text-white placeholder-gray-300 ${errors.email ? 'border-red-400' : 'border-gray-600'} focus:border-blue-400 focus:outline-none`}
               value={formData.email}
               onChange={handleChange}
             />
-            {errors.email && <p className="text-red-500 text-sm mt-1">{errors.email}</p>}
+            {errors.email && <p className="text-red-400 text-sm mt-1">{errors.email}</p>}
           </div>
 
           <div>
@@ -111,26 +119,26 @@ function Login() {
               type="password"
               name="password"
               placeholder="Password"
-              className={`w-full px-4 py-2 border rounded-lg ${errors.password ? 'border-red-500' : 'border-gray-300'}`}
+              className={`w-full px-4 py-2 bg-gray-800 bg-opacity-50 border rounded-lg text-white placeholder-gray-300 ${errors.password ? 'border-red-400' : 'border-gray-600'} focus:border-blue-400 focus:outline-none`}
               value={formData.password}
               onChange={handleChange}
             />
-            {errors.password && <p className="text-red-500 text-sm mt-1">{errors.password}</p>}
+            {errors.password && <p className="text-red-400 text-sm mt-1">{errors.password}</p>}
           </div>
 
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 disabled:bg-gray-400"
+            className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 disabled:bg-gray-400 transition-colors duration-200"
           >
             {isLoading ? 'Logging in...' : 'Login'}
           </button>
         </form>
 
         <div className="mt-6 text-center">
-          <p className="text-gray-600">
+          <p className="text-gray-300">
             Don't have an account?{' '}
-            <Link to="/signup" className="text-blue-600 hover:text-blue-800">
+            <Link to="/signup" className="text-blue-400 hover:text-blue-300 transition-colors duration-200">
               Sign up here
             </Link>
           </p>
